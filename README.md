@@ -273,26 +273,6 @@ All knobs live in the notebook, near the top of their respective sections:
 
 ---
 
-## Engineering notes: nine bugs and their fixes
-
-This version is a hardened rewrite of an earlier working-but-fragile notebook. Each fix is marked inline in the code as `# FIX n`.
-
-| # | Problem | Fix |
-|---|---|---|
-| 1 | `Chroma.from_documents` re-embedded and **re-inserted** every chunk on each run, duplicating the corpus and polluting the top-5 results with near-identical passages | Open the collection with `Chroma(...)`, add only when empty, and use deterministic content-hash IDs so re-adding upserts. `REBUILD_INDEX` forces a clean rebuild |
-| 2 | `llm = llm.bind_tools(tools)` rebound onto the same name, so re-running the cell wrapped an already-wrapped runnable | Keep `base_llm` separate from the bound `llm`; the cell is now idempotent |
-| 3 | Llama 3.1 sometimes printed tool-call JSON as plain text, leaving `tool_calls` empty — the graph ended early and the user saw raw JSON | `recover_tool_calls()` parses stray JSON out of the content and rebuilds a proper `AIMessage` |
-| 4 | No recursion guard — a model stuck in a search loop burned LangGraph's default 25 steps | `RECURSION_LIMIT = 14`, passed via config, with `GraphRecursionError` handled gracefully |
-| 5 | `trim_memory` used a flat `[-8:]` slice, which can start the window on an orphaned `AIMessage` | Pair-aware trimming: group into Human/AI pairs, drop orphans, keep the last N |
-| 6 | A tool raising an exception crashed the whole run | Tool execution wrapped in `try/except`; the error returns to the model as a `ToolMessage` so it can recover |
-| 7 | The agent called the retriever for questions about the *conversation* ("what's my name?"), wasting a round-trip on irrelevant chunks | System prompt and tool docstrings now state explicitly when **not** to search |
-| 8 | Unused imports (`dotenv`, `ChatPromptTemplate`, `Document`, `ToolNode`) | Removed; `START` is now used instead of `set_entry_point` |
-| 9 | The loop crashed on empty input and lost the turn on `Ctrl-C` | Empty input is skipped; `KeyboardInterrupt` saves and exits cleanly |
-
-Beyond the fixes, this version adds the three arithmetic tools, renames the tool node `retriever_agent` → `tool_agent` (it is no longer retrieval-specific), and raises the recursion limit from 8 to 14 to accommodate retrieve-then-compute chains.
-
----
-
 ## Example session
 
 ```
